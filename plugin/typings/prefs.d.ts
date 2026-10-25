@@ -32,6 +32,7 @@ declare namespace _ZoteroTypes {
       "transFirst": boolean;
       "ocr": boolean;
       "autoOcr": boolean;
+      "preserveImages": boolean;
       "noWatermark": boolean;
       "saveGlossary": boolean;
       "disableGlossary": boolean;

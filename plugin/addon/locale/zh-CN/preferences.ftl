@@ -60,3 +60,5 @@ pref-llmapi-edit      = 编辑
 pref-llmapi-activate  = 激活
 pref-llmapi-totop     = 置顶
 pref-check-connection = 检查连接
+pref-preserveImages = 保留图片及图内文字，不参与翻译
+pref-preserveImages-description = 仅适用于 PDF2zh Next 的 Python 模式。保留识别出的图表区域，正文和图注仍翻译；开启时停用 OCR，以免重新识别图片文字。

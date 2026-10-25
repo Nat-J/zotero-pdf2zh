@@ -60,3 +60,5 @@ pref-llmapi-edit      = Edit
 pref-llmapi-activate  = Activate
 pref-llmapi-totop     = Pin
 pref-check-connection = Check Connection
+pref-preserveImages = Preserve images and text inside figures
+pref-preserveImages-description = Requires PDF2zh Next in Python mode. Detected figures remain unchanged; body text and captions are translated. OCR is disabled while this option is enabled.

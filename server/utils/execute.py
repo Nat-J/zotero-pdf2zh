@@ -4,9 +4,14 @@ import select
 import subprocess
 import sys
 import threading
+from pathlib import Path
 from datetime import datetime
 
-from utils.deepseek_thinking import prepare_deepseek_runtime_command
+from utils.deepseek_thinking import (
+    prepare_deepseek_runtime_command,
+    _invocation_prefix,
+    _python_for_invocation_prefix,
+)
 from utils.environment_lifecycle import managed_python_env
 from utils.task_manager import task_manager
 
@@ -166,7 +171,7 @@ def _write_pty_chunk(data, leftover, task_id):
     return leftover
 
 
-def execute_with_progress(cmd, task_id, args, env_manager):
+def execute_with_progress(cmd, task_id, args, env_manager, preserve_images=False):
     """Execute translation command and update task progress in real time."""
     final_cmd = cmd
     final_env = os.environ.copy()
@@ -193,6 +198,13 @@ def execute_with_progress(cmd, task_id, args, env_manager):
     # flags. Validate the exact runtime that will be executed, then add those
     # flags before any translation/API request begins.
     final_cmd = prepare_deepseek_runtime_command(final_cmd, final_env)
+    prefix = _invocation_prefix(final_cmd)
+    if len(prefix) > 1 or Path(prefix[0]).stem == "pdf2zh_next":
+        python = _python_for_invocation_prefix(prefix)
+        if python is None:
+            raise RuntimeError("本地排版修复需要 PDF2zh Next 的 Python 环境。")
+        final_env["PDF2ZH_PRESERVE_IMAGES"] = "1" if preserve_images else "0"
+        final_cmd = [str(python), "-u", str(Path(__file__).with_name("pdf2zh_next_runner.py")), *final_cmd[len(prefix):]]
 
     print(f"[execute_with_progress] {' '.join(final_cmd)}\n")
 

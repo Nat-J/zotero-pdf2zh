@@ -33,6 +33,7 @@ pref("__prefsPrefix__.dualMode", "LR");
 pref("__prefsPrefix__.transFirst", false);
 pref("__prefsPrefix__.ocr", false);
 pref("__prefsPrefix__.autoOcr", true);
+pref("__prefsPrefix__.preserveImages", true);
 pref("__prefsPrefix__.noWatermark", true);
 pref("__prefsPrefix__.saveGlossary", false);
 pref("__prefsPrefix__.disableGlossary", false);

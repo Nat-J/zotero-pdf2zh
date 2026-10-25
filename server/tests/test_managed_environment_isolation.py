@@ -209,6 +209,7 @@ class ManagedEnvironmentIsolationTest(unittest.TestCase):
                 "prepare_deepseek_runtime_command",
                 side_effect=lambda cmd, env: cmd,
             ),
+            patch.object(execute, "_python_for_invocation_prefix", return_value=Path(sys.executable)),
             patch.object(execute, "_execute_with_pty", side_effect=capture),
         ):
             execute.execute_with_progress(

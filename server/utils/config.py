@@ -186,6 +186,10 @@ class Config:
         self.trans_first = stringToBoolean(request_data.get('transFirst', False))
         self.ocr = stringToBoolean(request_data.get('ocr', False))
         self.auto_ocr = stringToBoolean(request_data.get('autoOcr', False))
+        self.preserve_images = stringToBoolean(request_data.get('preserveImages', True))
+        if self.preserve_images:
+            self.ocr = False
+            self.auto_ocr = False
         self.no_watermark = stringToBoolean(request_data.get('noWatermark', True))
         self.save_auto_extracted_glossary = stringToBoolean(request_data.get('saveGlossary', False))
         self.disable_glossary = stringToBoolean(request_data.get('disableGlossary', False))
@@ -336,6 +340,8 @@ class Config:
             translation_config['pool_max_workers'] = self.pool_size if self.pool_size > 0 else 'null'
             pdf_config = new_config.setdefault('pdf', {})
             pdf_config['only_include_translated_page'] = self.only_include_translated_page
+            pdf_config['ocr_workaround'] = self.ocr
+            pdf_config['auto_enable_ocr_workaround'] = self.auto_ocr
 
             translator = None 
             if f'{service}_detail' in new_config:

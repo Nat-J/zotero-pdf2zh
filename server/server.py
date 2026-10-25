@@ -1134,6 +1134,8 @@ class PDFTranslator:
                 output_path.append(watermark_dual)
 
         if args.enable_winexe and os.path.exists(args.winexe_path):
+            if config.preserve_images:
+                raise ValueError("图片保护需要 Python 模式；请关闭 enable_winexe 或取消保留图片。")
             cmd = [f"{args.winexe_path}"] + cmd[1:]  # Windows可执行文件
             # 将所有是路径的字段, 改为os.path.normpath
             cmd = [os.path.normpath(arg) if os.path.isfile(arg) or os.path.isdir(arg) else arg for arg in cmd]
@@ -1213,9 +1215,9 @@ class PDFTranslator:
         elif args.enable_venv:
             # 使用 execute_with_progress 替代原来的 execute_in_env
             # 实时解析子进程输出中的进度信息并更新 task_manager
-            execute_with_progress(cmd, task_id, args, self.env_manager)
+            execute_with_progress(cmd, task_id, args, self.env_manager, preserve_images=config.preserve_images)
         else:
-            execute_with_progress(cmd, task_id, args, None)
+            execute_with_progress(cmd, task_id, args, None, preserve_images=config.preserve_images)
         existing = [p for p in output_path if os.path.exists(p)]
 
         for f in existing:

@@ -4,6 +4,10 @@ import { PDF2zhHelperFactory } from "./modules/pdf2zhHelper";
 import { getString, initLocale } from "./utils/locale";
 import { createZToolkit } from "./utils/ztoolkit";
 import { registerPrefsScripts, initTableUI } from "./modules/preferenceScript";
+import {
+    registerSelectionAssistant,
+    unregisterSelectionAssistant,
+} from "./modules/selectionAssistant";
 
 async function onStartup() {
     await Promise.all([
@@ -13,6 +17,7 @@ async function onStartup() {
     ]);
     initLocale(); // 初始化多语言
     PDF2zhBasicFactory.registerPrefs(); // 注册偏好设置
+    registerSelectionAssistant();
     await Promise.all(
         Zotero.getMainWindows().map((win) => onMainWindowLoad(win)),
     );
@@ -55,6 +60,7 @@ async function onMainWindowUnload(win: Window): Promise<void> {
 }
 
 function onShutdown(): void {
+    unregisterSelectionAssistant();
     ztoolkit.unregisterAll();
     addon.data.dialog?.window?.close();
     // Remove addon object

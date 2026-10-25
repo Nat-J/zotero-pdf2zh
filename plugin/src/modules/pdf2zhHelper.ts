@@ -1052,6 +1052,7 @@ export class PDF2zhHelperFactory {
             transFirst: getPref("transFirst")?.toString() || "",
             ocr: getPref("ocr")?.toString() || "",
             autoOcr: getPref("autoOcr")?.toString() || "",
+            preserveImages: getPref("preserveImages")?.toString() ?? "true",
             noWatermark: getPref("noWatermark")?.toString() || "",
             saveGlossary: getPref("saveGlossary")?.toString() || "",
             disableGlossary: getPref("disableGlossary")?.toString() || "",

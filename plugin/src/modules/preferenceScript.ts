@@ -592,7 +592,7 @@ export function loadLLMApisFromPrefs() {
     } catch (error) {
         ztoolkit.log("Error loading LLM APIs from prefs:", error);
     }
-    ztoolkit.log("LLM APIs loaded from prefs:", addon.data.llmApis);
+    ztoolkit.log("LLM API configurations loaded:", addon.data.llmApis?.map.size);
 }
 
 function updateLLMApiTableUI() {

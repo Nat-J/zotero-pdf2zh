@@ -38,6 +38,7 @@ export interface ServerConfig {
     // pdf2x专用配置
     ocr: string;
     autoOcr: string;
+    preserveImages: string;
     transFirst: string;
     noWatermark: string;
     fontFamily: string;
