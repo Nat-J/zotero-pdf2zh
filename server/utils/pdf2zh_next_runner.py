@@ -4,6 +4,7 @@ import os
 import re
 
 FIGURE_LAYOUTS = {"figure", "image", "chart", "figure_text", "figure_text_hybrid"}
+MATH_OPERATORS = {"exp", "log", "ln", "min", "max", "sin", "cos", "tan", "lim", "ref"}
 
 
 def is_element_contained_in_formula(element_box, formula_box, containment_threshold=0.95, tolerance=2.0):
@@ -27,6 +28,68 @@ def is_element_contained_in_formula(element_box, formula_box, containment_thresh
     return coverage >= containment_threshold
 
 
+def split_wrapped_text_lines(page):
+    from babeldoc.format.pdf.document_il.il_version_1 import Box, PdfLine, PdfParagraphComposition
+
+    for paragraph in page.pdf_paragraph:
+        compositions = []
+        for comp in paragraph.pdf_paragraph_composition:
+            line = comp.pdf_line
+            if not line or len(line.pdf_character) < 2:
+                compositions.append(comp)
+                continue
+            chars = line.pdf_character
+            width = max(c.box.x2 for c in chars) - min(c.box.x for c in chars)
+            groups = [[]]
+            previous = chars[0]
+            for char in chars:
+                size = max(char.pdf_style.font_size, previous.pdf_style.font_size)
+                # The line finder joins prose lines through tall sums; don't split scripts or display math.
+                if (previous.box.x - char.box.x > max(3 * size, width * 0.5)
+                        and previous.box.y - char.box.y > size * 0.8
+                        and not (char.formula_layout_id and char.formula_layout_id == previous.formula_layout_id)):
+                    groups.append([])
+                groups[-1].append(char)
+                previous = char
+            if len(groups) == 1:
+                compositions.append(comp)
+                continue
+            for group in groups:
+                boxes = [c.visual_bbox.box for c in group]
+                bounds = Box(min(b.x for b in boxes), min(b.y for b in boxes),
+                             max(b.x2 for b in boxes), max(b.y2 for b in boxes))
+                compositions.append(PdfParagraphComposition(pdf_line=PdfLine(box=bounds, pdf_character=group)))
+        paragraph.pdf_paragraph_composition = compositions
+
+
+def join_split_paragraphs(page):
+    from babeldoc.format.pdf.document_il.il_version_1 import Box
+
+    paragraphs = []
+    for para in page.pdf_paragraph:
+        if not para.pdf_paragraph_composition:
+            continue
+        previous = paragraphs[-1] if paragraphs else None
+        if (previous and para.layout_id is not None and previous.layout_id == para.layout_id
+                and previous.xobj_id == para.xobj_id):
+            left = previous.pdf_paragraph_composition[-1].pdf_line
+            right = para.pdf_paragraph_composition[0].pdf_line
+            if left and right and left.box and right.box:
+                size = max(c.pdf_style.font_size for c in left.pdf_character + right.pdf_character)
+                # An isolated hat can split one source paragraph into two overlapping translation boxes.
+                if (abs(left.box.y - right.box.y) < size * 0.2
+                        and 0 <= right.box.x - left.box.x2 <= size):
+                    left.pdf_character.extend(right.pdf_character)
+                    left.box = Box(min(left.box.x, right.box.x), min(left.box.y, right.box.y),
+                                   max(left.box.x2, right.box.x2), max(left.box.y2, right.box.y2))
+                    previous.pdf_paragraph_composition.extend(para.pdf_paragraph_composition[1:])
+                    previous.box = Box(min(previous.box.x, para.box.x), min(previous.box.y, para.box.y),
+                                       max(previous.box.x2, para.box.x2), max(previous.box.y2, para.box.y2))
+                    continue
+        paragraphs.append(para)
+    page.pdf_paragraph = paragraphs
+
+
 def protect_math_glyphs(page):
     from babeldoc.format.pdf.document_il.utils.formular_helper import collect_page_formula_font_ids
 
@@ -42,6 +105,22 @@ def protect_math_glyphs(page):
     protected = set()
     for line in lines:
         chars = line.pdf_character
+        # TeX uses CMR for delimiters/operators too; they must travel with the math glyphs.
+        roman_runs = []
+        for char in chars:
+            font = fonts.get(char.xobj_id, fonts[None]).get(char.pdf_style.font_id, "")
+            text = char.char_unicode or ""
+            if re.fullmatch(r"CMR\d+", font.split("+")[-1]):
+                if text in "()[]{}|,:;=+-/" and text:
+                    protected.add(id(char))
+                if text.isalpha():
+                    roman_runs.append(char)
+                    continue
+            if "".join(c.char_unicode for c in roman_runs) in MATH_OPERATORS:
+                protected.update(map(id, roman_runs))
+            roman_runs = []
+        if "".join(c.char_unicode for c in roman_runs) in MATH_OPERATORS:
+            protected.update(map(id, roman_runs))
         for i, char in enumerate(chars):
             text = char.char_unicode or ""
             font = fonts.get(char.xobj_id, fonts[None]).get(char.pdf_style.font_id, "")
@@ -106,9 +185,12 @@ def install_formula_fix():
         return
     original_process = cls.process_page_formulas
     original_classify = cls._classify_characters_in_composition
+    original_split_comma = cls.split_formula_by_comma
 
     def process_page_formulas(self, page):
+        split_wrapped_text_lines(page)
         self._pdf2zh_protected_math_chars = protect_math_glyphs(page)
+        join_split_paragraphs(page)
         original_process(self, page)
 
     def classify(self, *args, **kwargs):
@@ -116,10 +198,27 @@ def install_formula_fix():
         protected = getattr(self, "_pdf2zh_protected_math_chars", set())
         return [(char, bool(is_formula or id(char) in protected), corner) for char, is_formula, corner in tagged], first_is_bullet
 
+    def split_comma(self, formula):
+        parts = original_split_comma(self, formula)
+        size = max(c.pdf_style.font_size for c in formula.pdf_character)
+        joined, pending = [], []
+        for chars, comma in parts:
+            pending.extend(chars)
+            # A comma in a superscript/subscript is part of the variable, not a text separator.
+            if comma is not None and comma.pdf_style.font_size < size * 0.8:
+                pending.append(comma)
+            else:
+                joined.append((pending, comma))
+                pending = []
+        if pending:
+            joined.append((pending, None))
+        return joined
+
     # shortcut: BabelDOC 0.6 misses bold math letters and detaches hats; remove when upstream preserves both.
     process_page_formulas._pdf2zh_math_fix = True
     cls.process_page_formulas = process_page_formulas
     cls._classify_characters_in_composition = classify
+    cls.split_formula_by_comma = split_comma
 
 
 def figure_layout(char, layout_index, layout_map):
